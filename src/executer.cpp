@@ -4,6 +4,7 @@
 #include "sys/wait.h"
 #include <iostream>
 #include <vector>
+#include <fcntl.h>
 
 void Executer::execute(const std::vector<std::string> &tokens)
 {
@@ -11,10 +12,16 @@ void Executer::execute(const std::vector<std::string> &tokens)
         return;
 
     std::vector<const char *> argv;
+	std::string outfile;
+    bool background=false;
 
-    for (const std::string &token : tokens)
-        argv.push_back(token.c_str());
-    argv.push_back(nullptr);
+	for(const std::string &token : tokens){
+		if(token =="&"){
+			background =true;
+			break;}
+
+		argv.push_back(token.c_str());}
+  	 argv.push_back(nullptr);
 
     pid_t pid = fork();
 
@@ -22,6 +29,11 @@ void Executer::execute(const std::vector<std::string> &tokens)
         std::cerr << tokens[0] << ": failed to execute command" << std::endl;
     else if (pid == 0) // child process
     {
+
+	if(!outfile.empty()){
+		int fd=open(outfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+		dup2(fd, STDOUT_FILENO);
+		close(fd);}
         int status = execvp(argv[0], const_cast<char *const *>(argv.data()));
 
         if (status != 0)
@@ -34,6 +46,8 @@ void Executer::execute(const std::vector<std::string> &tokens)
             std::cerr << tokens[0] << ": " << msg << std::endl;
         }
     }
-    else // parent process (pid > 0)
-        waitpid(pid, nullptr, 0);
+    else{ // parent process (pid > 0)
+       if(!background)
+	 waitpid(pid, nullptr, 0);
+}
 }
